@@ -40,18 +40,28 @@ Deno.serve(async (request) => {
       p_window_seconds: 3600,
     })
     if (!allowed) throw new Error('rate_limited')
-    const { data: recipient } = await admin
+    const { data: recipients } = await admin
       .from('relationship_members')
       .select('user_id')
       .eq('relationship_id', body.relationshipId)
       .eq('status', 'active')
       .neq('user_id', user.id)
-      .maybeSingle()
-    if (!recipient) return json(request, { sent: 0 })
+    const recipientIds = [...new Set((recipients ?? []).map((recipient) => recipient.user_id))]
+    if (recipientIds.length === 0) return json(request, { sent: 0 })
     const { data: subscriptions } = await admin
       .from('push_subscriptions')
       .select('id,subscription')
-      .eq('user_id', recipient.user_id)
+      .in('user_id', recipientIds)
+    const { data: senderSubscriptions } = await admin
+      .from('push_subscriptions')
+      .select('subscription')
+      .eq('user_id', user.id)
+    const ownEndpoints = new Set(
+      (senderSubscriptions ?? [])
+        .map((entry) => (entry.subscription as { endpoint?: string } | null)?.endpoint)
+        .filter(Boolean),
+    )
+    const sentEndpoints = new Set<string>()
     webpush.setVapidDetails(
       Deno.env.get('VAPID_SUBJECT')!,
       Deno.env.get('VAPID_PUBLIC_KEY')!,
@@ -59,16 +69,19 @@ Deno.serve(async (request) => {
     )
     let sent = 0
     for (const subscription of subscriptions ?? []) {
+      const endpoint = (subscription.subscription as { endpoint?: string } | null)?.endpoint
+      if (!endpoint || ownEndpoints.has(endpoint) || sentEndpoints.has(endpoint)) continue
       try {
         await webpush.sendNotification(
           subscription.subscription,
           JSON.stringify({
             title: 'Lectura de libros',
             body: genericMessages[body.notificationKind],
-            url: '/',
+            url: Deno.env.get('APP_URL') ?? 'https://jorgeduartee86-ux.github.io/lectura-de-libros/',
           }),
           { TTL: 3600 },
         )
+        sentEndpoints.add(endpoint)
         sent += 1
       } catch (error) {
         const status = (error as { statusCode?: number }).statusCode

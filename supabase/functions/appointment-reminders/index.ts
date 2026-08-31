@@ -40,7 +40,7 @@ Deno.serve(async (request) => {
             JSON.stringify({
               title: 'Lectura de libros',
               body: 'Hay un nuevo evento en tu agenda de lectura.',
-              url: '/',
+              url: Deno.env.get('APP_URL') ?? 'https://jorgeduartee86-ux.github.io/lectura-de-libros/',
             }),
             { TTL: 900 },
           )

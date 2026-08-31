@@ -36,6 +36,18 @@ test('la aplicación expone un manifiesto PWA instalable', async ({ request }) =
   )
   const worker = await request.get('/sw.js')
   expect(worker.ok()).toBeTruthy()
+  expect(await worker.text()).toContain('push-sw.js')
+  const pushWorker = await request.get('/push-sw.js')
+  expect(pushWorker.ok()).toBeTruthy()
+  expect(await pushWorker.text()).toContain("addEventListener('push'")
+})
+
+test('la portada presenta una colección literaria real', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Clásicos que siguen conversando' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Don Quijote de la Mancha/ })).toBeVisible()
+  await expect(page.getByText('Miguel de Cervantes').first()).toBeVisible()
+  await expect(page.locator('.classic-book-card')).toHaveCount(4)
 })
 
 test('el acceso privado usa únicamente una clave numérica de seis cifras', async ({ page }, testInfo) => {

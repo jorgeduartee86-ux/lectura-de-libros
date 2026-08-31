@@ -33,6 +33,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (books.length === 0) {
       await Promise.all(seedBooks.map((book) => putBook(book)))
       books = seedBooks
+    } else {
+      const corrected = books.map((book) =>
+        book.id === 'orgullo-y-prejuicio' &&
+        book.favoriteQuote === 'No hay encanto igual a la ternura del corazón.'
+          ? { ...book, favoriteQuote: seedBooks[0].favoriteQuote, publishedYear: 1813 }
+          : book,
+      )
+      const existingIds = new Set(corrected.map((book) => book.id))
+      const additions = seedBooks.filter((book) => !existingIds.has(book.id))
+      await Promise.all(
+        [...corrected.filter((book, index) => book !== books[index]), ...additions].map(putBook),
+      )
+      books = [...corrected, ...additions]
     }
     const preferred = await getSetting<Theme>('theme')
     const theme = preferred ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

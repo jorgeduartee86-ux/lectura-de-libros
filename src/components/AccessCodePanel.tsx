@@ -7,7 +7,6 @@ import { Notice } from './ui'
 const errorMessages: Record<string, string> = {
   invalid_code_format: 'Escribe los seis números de la clave.',
   invalid_access_code: 'Esa clave no coincide. Inténtalo de nuevo.',
-  relationship_full: 'Este espacio ya tiene sus dos personas vinculadas.',
   rate_limited: 'Hubo varios intentos. Espera unos minutos y vuelve a probar.',
   anonymous_access_unavailable: 'No fue posible crear el acceso privado en este dispositivo.',
   service_unavailable: 'El espacio privado no está disponible en este momento.',

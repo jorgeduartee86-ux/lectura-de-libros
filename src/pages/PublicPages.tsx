@@ -20,6 +20,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { z } from 'zod'
 import { BookCover, EmptyState, Field, Modal, Notice } from '../components/ui'
 import { AccessCodePanel } from '../components/AccessCodePanel'
+import { literaryQuotes } from '../data/seed'
 import { importPairingEnvelope } from '../lib/crypto'
 import { promptPwaInstall, usePwaInstall } from '../lib/install'
 import { activatePrivateSession } from '../lib/privateRepository'
@@ -119,6 +120,13 @@ export function HomePage() {
   )
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const [quoteIndex] = useState(() => Math.floor(Date.now() / 86_400_000) % literaryQuotes.length)
+  const dailyQuote = literaryQuotes[quoteIndex]
+  const classics = books
+    .filter((book) =>
+      ['don-quijote', 'moby-dick', 'historia-de-dos-ciudades', 'anna-karenina'].includes(book.id),
+    )
+    .slice(0, 4)
   return (
     <main>
       <section className="welcome compact-welcome home-hero">
@@ -174,8 +182,9 @@ export function HomePage() {
           <span className="quote-mark" aria-hidden="true">
             “
           </span>
-          <blockquote>Somos lo que recordamos de nosotros mismos.</blockquote>
-          <p>— Carlos Ruiz Zafón</p>
+          <small className="quote-card-label">CITA REAL · {dailyQuote.book.toLocaleUpperCase()}</small>
+          <blockquote>{dailyQuote.text}</blockquote>
+          <p>— {dailyQuote.author}</p>
           <button
             className={`bookmark-button ${saved ? 'saved' : ''}`}
             onClick={() => setSaved((value) => !value)}
@@ -185,6 +194,32 @@ export function HomePage() {
             <Heart size={19} fill={saved ? 'currentColor' : 'none'} />
           </button>
         </article>
+      </section>
+      <section className="curated-shelf" aria-labelledby="curated-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">ESTANTERÍA CURADA</p>
+            <h2 id="curated-title">Clásicos que siguen conversando</h2>
+          </div>
+          <Link className="text-button" to="/biblioteca">
+            Explorar biblioteca <ArrowRight size={17} />
+          </Link>
+        </div>
+        <div className="classic-grid">
+          {classics.map((book) => (
+            <Link to={`/libro/${book.id}`} className="classic-book-card" key={book.id}>
+              <BookCover book={book} />
+              <div>
+                <span>
+                  {book.genre} · {book.publishedYear}
+                </span>
+                <h3>{book.title}</h3>
+                <p>{book.author}</p>
+                <blockquote>“{book.favoriteQuote}”</blockquote>
+              </div>
+            </Link>
+          ))}
+        </div>
       </section>
       <section className="reading-section" aria-labelledby="reading-title">
         <div className="section-heading">
@@ -202,7 +237,10 @@ export function HomePage() {
               <Link className="book-card" to={`/libro/${book.id}`} key={book.id}>
                 <BookCover book={book} />
                 <div className="book-meta">
-                  <p className="genre">{book.genre}</p>
+                  <p className="genre">
+                    {book.genre}
+                    {book.publishedYear ? ` · ${book.publishedYear}` : ''}
+                  </p>
                   <h3>{book.title}</h3>
                   <p>{book.author}</p>
                   <div className="progress-line" aria-label={`${book.progress}% leído`}>

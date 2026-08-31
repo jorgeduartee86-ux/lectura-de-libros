@@ -81,15 +81,19 @@ export async function createPrivateItem<T>(
     ...(metadata?.scheduledAt ? { scheduled_at: metadata.scheduledAt } : {}),
   }
   const queueItem: OutboxItem = { id, table, row, attempts: 0, nextAttemptAt: Date.now() }
+  let pending = !supabase || !navigator.onLine || relationshipId.startsWith('local-')
 
   await putPrivateCache({ ...queueItem, cachedAt: Date.now() })
   if (supabase && navigator.onLine && !relationshipId.startsWith('local-')) {
     const { error } = await supabase.from(table).insert(row)
-    if (error) await putOutbox(queueItem)
+    if (error) {
+      pending = true
+      await putOutbox(queueItem)
+    }
   } else {
     await putOutbox(queueItem)
   }
-  return decryptRow<T>(table, row, !supabase || !navigator.onLine)
+  return decryptRow<T>(table, row, pending)
 }
 
 export async function listPrivateItems<T>(table: PrivateTable): Promise<PrivateItem<T>[]> {

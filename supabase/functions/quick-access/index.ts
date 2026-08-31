@@ -33,12 +33,8 @@ Deno.serve(async (request) => {
 
     const { data, error } = await admin.rpc('join_quick_access', { target_user: user.id }).single()
     if (error) {
-      const code = error.message.includes('relationship_full')
-        ? 'relationship_full'
-        : error.message.includes('already_linked')
-          ? 'already_linked'
-          : 'operation_failed'
-      return json(request, { error: code }, code === 'relationship_full' ? 409 : 400)
+      const code = error.message.includes('already_linked') ? 'already_linked' : 'operation_failed'
+      return json(request, { error: code }, 400)
     }
     return json(request, {
       relationshipId: data.relationship_id,

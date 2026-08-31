@@ -15,11 +15,15 @@ import {
   MessageCircleHeart,
   MoonStar,
   Orbit,
+  EyeOff,
+  Pencil,
   Plus,
+  Reply,
   RotateCw,
   Send,
   Settings,
   ShieldCheck,
+  SmilePlus,
   Sparkles,
   Star,
   Trash2,
@@ -29,7 +33,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { dailyQuestions, letterCategories, rouletteOptions, signals } from '../data/seed'
-import { createPairingEnvelope, createPairingSecret } from '../lib/crypto'
 import {
   downloadEncryptedMemoryImage,
   uploadEncryptedMemoryImage,
@@ -40,15 +43,16 @@ import {
   createPresenceChannel,
   createPrivateItem,
   createTypingChannel,
-  getPrivateSession,
   listPrivateItems,
   subscribeToTable,
 } from '../lib/privateRepository'
-import { clearSensitiveCache, deleteVault, getSetting, putSetting } from '../lib/storage'
+import { clearSensitiveCache, deleteVault } from '../lib/storage'
+import { enablePushNotifications, getPushState, type PushState } from '../lib/notifications'
 import { supabase } from '../lib/supabase'
 import { useAppStore } from '../store/app'
 import type { PrivateItem, PrivateTable } from '../types'
 import { AccessCodePanel } from '../components/AccessCodePanel'
+import { NotificationOnboarding } from '../components/NotificationOnboarding'
 import { EmptyState, Field, Modal, Notice } from '../components/ui'
 
 const AUTO_LOCK_MS = 5 * 60_000
@@ -65,9 +69,27 @@ function usePrivateItems<T extends Record<string, unknown>>(table: PrivateTable)
   }, [table])
   useEffect(() => {
     void load()
-    return subscribeToTable<T>(table, (item) =>
-      setItems((current) => (current.some((entry) => entry.id === item.id) ? current : [...current, item])),
+    const unsubscribe = subscribeToTable<T>(table, (item) =>
+      setItems((current) =>
+        current.some((entry) => entry.id === item.id)
+          ? current
+          : [...current, item].sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+      ),
     )
+    const refresh = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) void load()
+    }
+    const interval = window.setInterval(refresh, 6_000)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('online', refresh)
+    return () => {
+      unsubscribe()
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('online', refresh)
+    }
   }, [load, table])
   const add = useCallback(
     async (contentType: string, content: T, metadata?: { scheduledAt?: string }) => {
@@ -188,6 +210,7 @@ export function PrivateShell() {
       <div className="private-main" key={location.pathname}>
         <Outlet />
       </div>
+      <NotificationOnboarding session={session} />
     </div>
   )
 }
@@ -346,13 +369,21 @@ export function ConversationPage() {
   }, [text])
   return (
     <main className="private-page conversation-page">
-      <header className="private-page-heading">
-        <div>
-          <p className="private-eyebrow">
-            CAPÍTULO {Math.ceil((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000)}
-          </p>
-          <h1>La noche en que seguimos escribiendo</h1>
-          <p>Mensajes cifrados de extremo a extremo.</p>
+      <header className="private-page-heading chat-heading">
+        <div className="chat-person">
+          <span className="chat-avatar" aria-hidden="true">
+            <BookHeart />
+          </span>
+          <div>
+            <p className="private-eyebrow">
+              CAPÍTULO{' '}
+              {Math.ceil((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000)}
+            </p>
+            <h1>Entre páginas</h1>
+            <p className="chat-security">
+              <ShieldCheck /> Conversación privada y sincronizada
+            </p>
+          </div>
         </div>
         <label className="private-search">
           <span className="sr-only">Buscar en este capítulo</span>
@@ -363,6 +394,9 @@ export function ConversationPage() {
           />
         </label>
       </header>
+      <div className="chat-date-divider">
+        <span>Hoy · seguimos escribiendo</span>
+      </div>
       <section className="messages" aria-live="polite">
         {loading ? (
           <div className="private-loader">
@@ -375,36 +409,75 @@ export function ConversationPage() {
             text="Escribe la primera línea de este capítulo."
           />
         ) : (
-          displayedItems.map((item) => (
-            <article className={`message ${item.senderId === userId ? 'mine' : ''}`} key={item.id}>
-              {item.content.replyTo && <small className="reply-label">En respuesta a otra página</small>}
-              <p>{item.content.text}</p>
-              {item.deleteRequested && (
-                <small className="reply-label">El autor solicitó borrarlo para ambos</small>
-              )}
-              {item.reactions > 0 && <span className="message-reaction">♡ {item.reactions}</span>}
-              <footer>
-                <time>
-                  {new Date(item.createdAt).toLocaleTimeString('es-CO', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </time>
-                {item.pending ? (
-                  <Clock3 aria-label="Pendiente de sincronizar" />
-                ) : (
-                  <Check aria-label="Enviado" />
+          displayedItems.map((item) => {
+            const mine = item.senderId === userId
+            return (
+              <div className={`message-row ${mine ? 'mine' : ''}`} key={item.id}>
+                {!mine && (
+                  <span className="message-avatar">
+                    <MoonStar />
+                  </span>
                 )}
-                <button onClick={() => setReplyTo(item.id)}>Responder</button>
-                <button onClick={() => void sendEvent('reaction', item.id)}>Reaccionar</button>
-                {item.senderId === userId && <button onClick={() => edit(item)}>Editar</button>}
-                <button onClick={() => void sendEvent('delete-self', item.id)}>Ocultar</button>
-                {item.senderId === userId && (
-                  <button onClick={() => void sendEvent('delete-request', item.id)}>Borrar para ambos</button>
-                )}
-              </footer>
-            </article>
-          ))
+                <article className={`message ${mine ? 'mine' : ''}`}>
+                  <small className="message-author">{mine ? 'Tú' : 'La otra persona'}</small>
+                  {item.content.replyTo && <small className="reply-label">En respuesta a otra página</small>}
+                  <p>{item.content.text}</p>
+                  {item.deleteRequested && (
+                    <small className="reply-label">Se solicitó borrarlo para ambos</small>
+                  )}
+                  {item.reactions > 0 && <span className="message-reaction">♡ {item.reactions}</span>}
+                  <div className="message-bottom">
+                    <nav className="message-tools" aria-label="Acciones del mensaje">
+                      <button onClick={() => setReplyTo(item.id)} title="Responder" aria-label="Responder">
+                        <Reply />
+                      </button>
+                      <button
+                        onClick={() => void sendEvent('reaction', item.id)}
+                        title="Reaccionar"
+                        aria-label="Reaccionar"
+                      >
+                        <SmilePlus />
+                      </button>
+                      {mine && (
+                        <button onClick={() => edit(item)} title="Editar" aria-label="Editar">
+                          <Pencil />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void sendEvent('delete-self', item.id)}
+                        title="Ocultar para mí"
+                        aria-label="Ocultar para mí"
+                      >
+                        <EyeOff />
+                      </button>
+                      {mine && (
+                        <button
+                          onClick={() => void sendEvent('delete-request', item.id)}
+                          title="Borrar para ambos"
+                          aria-label="Borrar para ambos"
+                        >
+                          <Trash2 />
+                        </button>
+                      )}
+                    </nav>
+                    <footer>
+                      <time>
+                        {new Date(item.createdAt).toLocaleTimeString('es-CO', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </time>
+                      {item.pending ? (
+                        <Clock3 aria-label="Pendiente de sincronizar" />
+                      ) : (
+                        <Check aria-label="Enviado" />
+                      )}
+                    </footer>
+                  </div>
+                </article>
+              </div>
+            )
+          })
         )}
         <div ref={endRef} />
       </section>
@@ -428,7 +501,7 @@ export function ConversationPage() {
           maxLength={4000}
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder="Escribe una nueva línea…"
+          placeholder="Escribe un mensaje…"
         />
         <button className="send-button" disabled={!text.trim()} aria-label="Enviar">
           <Send />
@@ -1420,61 +1493,16 @@ export function SettingsPage() {
   const session = useAppStore((state) => state.session)
   const setSession = useAppStore((state) => state.setSession)
   const navigate = useNavigate()
-  const [pushState, setPushState] = useState<NotificationPermission | 'unsupported'>(
-    !('Notification' in window) ? 'unsupported' : Notification.permission,
-  )
-  const [inviteUrl, setInviteUrl] = useState('')
+  const [pushState, setPushState] = useState<PushState>(() => getPushState())
+  const [pushBusy, setPushBusy] = useState(false)
   const statuses = usePrivateItems<SignalContent>('signals')
   const [romanticStatus, setRomanticStatus] = useState('Pensando en ti')
-  const [busy, setBusy] = useState(false)
   const [danger, setDanger] = useState<'unlink' | 'delete' | null>(null)
   const activatePush = async () => {
-    if (!('Notification' in window)) return
-    const permission = await Notification.requestPermission()
-    setPushState(permission)
-    if (permission !== 'granted' || !supabase) return
-    const registration = await navigator.serviceWorker.ready
-    const key = import.meta.env.VITE_VAPID_PUBLIC_KEY
-    if (!key || !session) return
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: key,
-    })
-    let deviceId = await getSetting<string>('deviceId')
-    if (!deviceId) {
-      deviceId = crypto.randomUUID()
-      await putSetting('deviceId', deviceId)
-    }
-    await supabase.from('devices').upsert({
-      id: deviceId,
-      user_id: session.userId,
-      label: navigator.userAgent.includes('iPhone') ? 'iPhone' : 'Navegador actual',
-      last_seen_at: new Date().toISOString(),
-    })
-    await supabase
-      .from('push_subscriptions')
-      .upsert(
-        { user_id: session.userId, device_id: deviceId, subscription: subscription.toJSON() },
-        { onConflict: 'user_id,device_id' },
-      )
-  }
-  const createInvite = async () => {
-    if (!supabase || !session?.relationshipId) return
-    setBusy(true)
-    try {
-      const { masterKey } = getPrivateSession()
-      const secret = createPairingSecret()
-      const envelope = await createPairingEnvelope(masterKey, secret, session.relationshipId)
-      const { data, error } = await supabase.functions.invoke('create-invite', {
-        body: { pairingEnvelope: envelope, expiresInHours: 24 },
-      })
-      if (error) throw error
-      setInviteUrl(
-        `${location.origin}${import.meta.env.BASE_URL}aceptar-invitacion/${data.token as string}#s=${encodeURIComponent(secret)}`,
-      )
-    } finally {
-      setBusy(false)
-    }
+    if (!session) return
+    setPushBusy(true)
+    setPushState(await enablePushNotifications(session))
+    setPushBusy(false)
   }
   const leave = async () => {
     if (!supabase || !danger) return
@@ -1493,7 +1521,7 @@ export function SettingsPage() {
         <div>
           <p className="private-eyebrow">CONFIGURACIÓN</p>
           <h1>Privacidad y preferencias</h1>
-          <p>Ambos miembros tienen los mismos permisos.</p>
+          <p>El mismo acceso funciona en sus teléfonos y dispositivos.</p>
         </div>
       </header>
       <section className="settings-group">
@@ -1538,42 +1566,36 @@ export function SettingsPage() {
           </div>
           <button
             className="private-secondary"
-            disabled={pushState === 'granted' || pushState === 'unsupported'}
+            disabled={pushBusy || pushState === 'granted' || pushState === 'unsupported'}
             onClick={() => void activatePush()}
           >
             {pushState === 'granted'
-              ? 'Activadas'
+              ? 'Activadas en este dispositivo'
               : pushState === 'denied'
                 ? 'Permiso denegado'
                 : pushState === 'unsupported'
                   ? 'No compatible'
-                  : 'Activar'}
+                  : pushBusy
+                    ? 'Activando…'
+                    : pushState === 'error'
+                      ? 'Intentar otra vez'
+                      : 'Activar avisos'}
           </button>
         </div>
       </section>
       <section className="settings-group">
         <h2>
-          <UsersRound /> La relación
+          <UsersRound /> Acceso al espacio
         </h2>
         <div className="setting-row">
           <div>
-            <strong>Invitar a la segunda persona</strong>
-            <small>Enlace de un solo uso, válido durante 24 horas.</small>
+            <strong>Entrada con la clave de seis números</strong>
+            <small>
+              Pueden entrar y salir cuantas veces necesiten, también desde sus otros dispositivos.
+            </small>
           </div>
-          <button
-            className="private-secondary"
-            disabled={busy || !supabase}
-            onClick={() => void createInvite()}
-          >
-            {busy ? 'Creando…' : 'Crear invitación'}
-          </button>
+          <span>Sin límite de entradas</span>
         </div>
-        {inviteUrl && (
-          <div className="invite-output">
-            <input readOnly value={inviteUrl} />
-            <button onClick={() => void navigator.clipboard.writeText(inviteUrl)}>Copiar</button>
-          </div>
-        )}
       </section>
       <section className="settings-group">
         <h2>
@@ -1604,14 +1626,13 @@ export function SettingsPage() {
           </div>
           <button
             className="private-secondary"
-            onClick={async () => {
-              await supabase?.auth.signOut()
+            onClick={() => {
               clearPrivateSession()
-              setSession(null)
+              useAppStore.getState().setPrivateLocked(true)
               navigate('/')
             }}
           >
-            Cerrar sesión
+            Cerrar espacio
           </button>
         </div>
         <div className="setting-row">

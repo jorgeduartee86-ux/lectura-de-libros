@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'prompt',
+        registerType: 'autoUpdate',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
         manifest: {
           id: base,
@@ -47,6 +47,7 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
+          importScripts: ['push-sw.js'],
           navigateFallback: `${base}index.html`,
           cleanupOutdatedCaches: true,
           clientsClaim: true,
