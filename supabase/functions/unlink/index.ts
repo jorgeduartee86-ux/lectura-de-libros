@@ -22,13 +22,11 @@ Deno.serve(async (request) => {
       .update({ revoked_at: new Date().toISOString() })
       .eq('relationship_id', member.relationship_id)
       .is('used_at', null)
-    await admin
-      .from('audit_events')
-      .insert({
-        relationship_id: member.relationship_id,
-        actor_id: user.id,
-        event_type: 'relationship_unlinked',
-      })
+    await admin.from('audit_events').insert({
+      relationship_id: member.relationship_id,
+      actor_id: user.id,
+      event_type: 'relationship_unlinked',
+    })
     return json(request, { unlinked: true })
   } catch (error) {
     return json(request, { error: publicError(error) }, 400)

@@ -1,4 +1,5 @@
 import { RefreshCw, WifiOff, X } from 'lucide-react'
+import { useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 
 export function PwaUpdate() {
@@ -7,6 +8,11 @@ export function PwaUpdate() {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW()
+  useEffect(() => {
+    if (!offlineReady || needRefresh) return
+    const timer = window.setTimeout(() => setOfflineReady(false), 4500)
+    return () => window.clearTimeout(timer)
+  }, [needRefresh, offlineReady, setOfflineReady])
   if (!offlineReady && !needRefresh) return null
   return (
     <aside className="pwa-toast" role="status">

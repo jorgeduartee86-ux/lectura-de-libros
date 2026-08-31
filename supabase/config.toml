@@ -23,8 +23,12 @@ additional_redirect_urls = [
   "http://localhost:5173/**",
   "http://127.0.0.1:5173/**",
 ]
-enable_signup = false
+enable_signup = true
+enable_anonymous_sign_ins = true
 minimum_password_length = 8
+
+[auth.email]
+enable_signup = false
 
 [storage]
 enabled = true
@@ -53,3 +57,5 @@ verify_jwt = true
 verify_jwt = false
 [functions.appointment-reminders]
 verify_jwt = false
+[functions.quick-access]
+verify_jwt = true

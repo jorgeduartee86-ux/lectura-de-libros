@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createPairingEnvelope,
   createPairingSecret,
+  createSharedVault,
   createVault,
   decryptBinary,
   decryptContent,
@@ -78,6 +79,17 @@ describe('protocolo de cifrado', () => {
     await expect(
       importPairingEnvelope(createPairingSecret(), envelope, context.relationshipId, 'x'),
     ).rejects.toThrow()
+  })
+
+  it('permite que dos dispositivos con la misma clave abran los mismos mensajes', async () => {
+    const firstDevice = await createSharedVault('151025', context.relationshipId)
+    const secondDevice = await createSharedVault('151025', context.relationshipId)
+    const envelope = await encryptContent(firstDevice.masterKey, { text: 'Nuestro capítulo' }, context)
+    await expect(decryptContent(secondDevice.masterKey, envelope, context)).resolves.toEqual({
+      text: 'Nuestro capítulo',
+    })
+    const wrongCode = await createSharedVault('000000', context.relationshipId)
+    await expect(decryptContent(wrongCode.masterKey, envelope, context)).rejects.toThrow()
   })
 
   it('cifra archivos binarios con el mismo contexto autenticado', async () => {

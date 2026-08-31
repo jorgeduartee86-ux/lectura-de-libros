@@ -103,12 +103,12 @@ function Bootstrap() {
         <Route path="autores" element={<Authors />} />
         <Route path="buscar" element={<Search />} />
         <Route path="instalar" element={<Install />} />
-        <Route path="acceso" element={<Auth />} />
         <Route path="vincular" element={<LinkAccount />} />
         <Route path="aceptar-invitacion/:token" element={<AcceptInvitation />} />
         <Route path="privacidad" element={<Privacy />} />
         <Route path="offline" element={<Offline />} />
       </Route>
+      <Route path="acceso" element={<Auth />} />
       <Route path="desbloquear" element={<Unlock />} />
       <Route path="historia" element={<PrivateLayout />}>
         <Route index element={<StoryHome />} />

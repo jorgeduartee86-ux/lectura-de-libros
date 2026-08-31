@@ -110,6 +110,27 @@ export async function createVault(pin: string, relationshipId: string) {
   return createVaultFromBytes(pin, relationshipId, randomBytes(32))
 }
 
+export async function createSharedVault(pin: string, relationshipId: string) {
+  const material = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(pin.normalize('NFKC')),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: encoder.encode(`nuestra-historia:${relationshipId}:shared-v1`),
+      iterations: PIN_ITERATIONS,
+    },
+    material,
+    256,
+  )
+  return createVaultFromBytes(pin, relationshipId, new Uint8Array(bits))
+}
+
 export async function unlockVault(pin: string, record: VaultRecord) {
   const pinKey = await derivePinKey(pin, base64ToBytes(record.pinSalt))
   const bytes = await unwrapBytes(

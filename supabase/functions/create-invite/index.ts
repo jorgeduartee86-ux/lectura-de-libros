@@ -44,24 +44,20 @@ Deno.serve(async (request) => {
     const token = randomToken()
     const tokenHash = await sha256(token)
     const expiresAt = new Date(Date.now() + body.expiresInHours * 3600_000).toISOString()
-    const { error } = await admin
-      .from('relationship_invites')
-      .insert({
-        relationship_id: member.relationship_id,
-        created_by: user.id,
-        token_hash: tokenHash,
-        pairing_envelope: body.pairingEnvelope,
-        expires_at: expiresAt,
-      })
+    const { error } = await admin.from('relationship_invites').insert({
+      relationship_id: member.relationship_id,
+      created_by: user.id,
+      token_hash: tokenHash,
+      pairing_envelope: body.pairingEnvelope,
+      expires_at: expiresAt,
+    })
     if (error) throw error
-    await admin
-      .from('audit_events')
-      .insert({
-        relationship_id: member.relationship_id,
-        actor_id: user.id,
-        event_type: 'invite_created',
-        metadata: { expires_at: expiresAt },
-      })
+    await admin.from('audit_events').insert({
+      relationship_id: member.relationship_id,
+      actor_id: user.id,
+      event_type: 'invite_created',
+      metadata: { expires_at: expiresAt },
+    })
     return json(request, { token, expiresAt }, 201)
   } catch (error) {
     return json(request, { error: error instanceof z.ZodError ? 'invalid_payload' : publicError(error) }, 400)

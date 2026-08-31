@@ -1,7 +1,21 @@
-import { BookOpen, Heart, Home, Library, Menu, Moon, Search, Sun, UserRound } from 'lucide-react'
+import {
+  BookKey,
+  BookOpen,
+  Download,
+  Heart,
+  Home,
+  Library,
+  Menu,
+  Moon,
+  Search,
+  Sun,
+  UserRound,
+  X,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store/app'
+import { promptPwaInstall, usePwaInstall } from '../lib/install'
 import { PwaUpdate } from './PwaUpdate'
 
 export function Brand() {
@@ -26,6 +40,7 @@ export function PublicShell() {
   const [query, setQuery] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
+  const install = usePwaInstall()
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -92,15 +107,36 @@ export function PublicShell() {
       </header>
       {mobileOpen && (
         <nav className="mobile-drawer" aria-label="Menú móvil">
+          <header>
+            <span>Menú de lectura</span>
+            <button aria-label="Cerrar menú" onClick={() => setMobileOpen(false)}>
+              <X />
+            </button>
+          </header>
           <NavLink onClick={() => setMobileOpen(false)} to="/biblioteca">
             Biblioteca
           </NavLink>
           <NavLink onClick={() => setMobileOpen(false)} to="/citas">
             Citas favoritas
           </NavLink>
-          <NavLink onClick={() => setMobileOpen(false)} to="/instalar">
-            Instalar aplicación
+          <NavLink className="drawer-private-link" onClick={() => setMobileOpen(false)} to="/acceso">
+            <BookKey /> Entre páginas
           </NavLink>
+          {install.available ? (
+            <button
+              className="drawer-install-button"
+              onClick={() => {
+                setMobileOpen(false)
+                void promptPwaInstall()
+              }}
+            >
+              <Download /> Instalar aplicación
+            </button>
+          ) : (
+            <NavLink onClick={() => setMobileOpen(false)} to="/instalar">
+              Instalar aplicación
+            </NavLink>
+          )}
           <NavLink onClick={() => setMobileOpen(false)} to="/privacidad">
             Privacidad
           </NavLink>
@@ -155,6 +191,10 @@ export function PublicShell() {
         <NavLink to="/citas">
           <Heart />
           <span>Citas</span>
+        </NavLink>
+        <NavLink className="private-bottom-link" to="/acceso">
+          <BookKey />
+          <span>Entre páginas</span>
         </NavLink>
       </nav>
       <footer className="public-footer">

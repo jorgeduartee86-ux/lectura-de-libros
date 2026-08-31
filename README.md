@@ -18,9 +18,10 @@ npm install
 npm run dev
 ```
 
-Abre `http://localhost:5173`. La biblioteca pública funciona sin Supabase. Para
-vincular dos cuentas, completa `.env`, ejecuta las migraciones y despliega las
-Edge Functions según [SETUP_SUPABASE.md](SETUP_SUPABASE.md).
+Abre `http://localhost:5173`. La biblioteca pública funciona sin Supabase. En la
+versión publicada, cada una de las dos personas entra a **Nuestra Historia** con
+la misma clave numérica de seis cifras; Supabase asigna una identidad distinta a
+cada dispositivo sin pedir correo ni contraseña.
 
 ## Comandos
 
@@ -62,8 +63,10 @@ como secretos de Supabase; nunca se copian a variables `VITE_*`.
 - No hay rastreo de ubicación, contactos, cámara silenciosa ni analítica de terceros.
 - El contenido privado se cifra en el dispositivo con AES-GCM; las subclaves se
   derivan con HKDF y el PIN envuelve la clave local mediante PBKDF2.
-- El secreto de emparejamiento viaja en el fragmento `#` de la invitación, que el
-  navegador no envía al servidor.
+- El acceso numérico se valida en una Edge Function con límite de intentos y su
+  hash se conserva como secreto de Supabase, nunca dentro del frontend.
+- Los dos dispositivos derivan localmente la misma clave de cifrado a partir de
+  la clave acordada y el identificador privado de la relación.
 - RLS deniega por defecto y comprueba membresía, remitente y máximo dos miembros.
 - Las notificaciones contienen únicamente frases literarias genéricas.
 - La bóveda se bloquea al ocultar o cerrar la página y después de cinco minutos.

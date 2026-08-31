@@ -19,10 +19,12 @@ import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { BookCover, EmptyState, Field, Modal, Notice } from '../components/ui'
+import { AccessCodePanel } from '../components/AccessCodePanel'
 import { importPairingEnvelope } from '../lib/crypto'
+import { promptPwaInstall, usePwaInstall } from '../lib/install'
 import { activatePrivateSession } from '../lib/privateRepository'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import { listVaults, putVault } from '../lib/storage'
+import { supabase } from '../lib/supabase'
+import { putVault } from '../lib/storage'
 import { useAppStore } from '../store/app'
 import type { Book, ReadingStatus } from '../types'
 
@@ -115,14 +117,33 @@ export function HomePage() {
   const date = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }).format(
     new Date(),
   )
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
   return (
     <main>
-      <section className="welcome compact-welcome">
-        <div>
+      <section className="welcome compact-welcome home-hero">
+        <div className="welcome-copy">
           <p className="eyebrow">{date.toLocaleUpperCase()}</p>
-          <h1>Buenos días, lectora.</h1>
+          <h1>{greeting}, lectora.</h1>
           <p>Una historia nueva siempre está a una página de distancia.</p>
+          <div className="welcome-actions">
+            <Link className="primary-button" to="/biblioteca">
+              Abrir mi biblioteca <ArrowRight size={17} />
+            </Link>
+            <Link className="quiet-access-link" to="/acceso">
+              <ShieldCheck /> Entre páginas
+            </Link>
+          </div>
         </div>
+        <aside className="today-reading-note">
+          <span>LECTURA ACTUAL</span>
+          <strong>{reading[0]?.title ?? 'Tu próxima historia'}</strong>
+          <small>{reading[0]?.author ?? 'Elige un libro para comenzar'}</small>
+          <div className="note-progress" aria-label={`${reading[0]?.progress ?? 0}% leído`}>
+            <i style={{ width: `${reading[0]?.progress ?? 0}%` }} />
+          </div>
+          <em>{reading[0]?.progress ?? 0}% de esta página</em>
+        </aside>
       </section>
       <section className="daily-grid" aria-label="Selección del día">
         <article className="recommendation-card">
@@ -518,31 +539,15 @@ export function SearchPage() {
   )
 }
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
 export function InstallPage() {
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [installed, setInstalled] = useState(matchMedia('(display-mode: standalone)').matches)
+  const { available, installed } = usePwaInstall()
+  const [showHelp, setShowHelp] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
   const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent)
-  useEffect(() => {
-    const capture = (event: Event) => {
-      event.preventDefault()
-      setInstallPrompt(event as BeforeInstallPromptEvent)
-    }
-    const done = () => setInstalled(true)
-    window.addEventListener('beforeinstallprompt', capture)
-    window.addEventListener('appinstalled', done)
-    return () => {
-      window.removeEventListener('beforeinstallprompt', capture)
-      window.removeEventListener('appinstalled', done)
-    }
-  }, [])
   const install = async () => {
-    await installPrompt?.prompt()
-    if ((await installPrompt?.userChoice)?.outcome === 'accepted') setInstalled(true)
+    const result = await promptPwaInstall()
+    setDismissed(result === 'dismissed')
+    setShowHelp(result === 'unavailable' || result === 'dismissed')
   }
   return (
     <main className="page-main narrow">
@@ -572,15 +577,26 @@ export function InstallPage() {
             </ol>
           ) : (
             <>
-              <p>Usa el botón para añadirla a tu pantalla de inicio.</p>
-              <button className="primary-button" disabled={!installPrompt} onClick={() => void install()}>
-                Instalar aplicación
+              <p>
+                {available
+                  ? 'Android ya tiene lista la instalación. Toca el botón y confirma.'
+                  : 'Puedes añadirla desde Chrome y abrirla como cualquier otra aplicación.'}
+              </p>
+              <button className="primary-button install-main-button" onClick={() => void install()}>
+                <Download /> {available ? 'Instalar ahora' : 'Ver cómo instalar'}
               </button>
-              {!installPrompt && (
-                <small>
-                  Si el botón aún no está disponible, abre el menú del navegador y elige “Instalar
-                  aplicación”.
-                </small>
+              {(showHelp || !available) && (
+                <div className="android-install-guide" role="status">
+                  <strong>
+                    {dismissed ? 'La instalación se cerró' : 'Si Android no muestra la ventana'}
+                  </strong>
+                  <ol>
+                    <li>Abre esta página directamente en Google Chrome.</li>
+                    <li>Toca los tres puntos ⋮ de la esquina superior.</li>
+                    <li>Elige “Instalar aplicación” o “Añadir a pantalla principal”.</li>
+                    <li>Confirma tocando “Instalar”.</li>
+                  </ol>
+                </div>
               )}
             </>
           )}
@@ -613,129 +629,8 @@ export function InstallPage() {
   )
 }
 
-const authSchema = z.object({
-  email: z.email('Escribe un correo válido'),
-  password: z.string().min(8, 'Usa al menos 8 caracteres'),
-  invitation: z.string().optional(),
-})
-type AuthValues = z.infer<typeof authSchema>
-
 export function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [message, setMessage] = useState<string | null>(null)
-  const setSession = useAppStore((state) => state.setSession)
-  const navigate = useNavigate()
-  const authLocation = useLocation()
-  const returnTo = (authLocation.state as { returnTo?: string } | null)?.returnTo
-  const invitedToken = returnTo?.match(/aceptar-invitacion\/([^#?]+)/)?.[1]
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<AuthValues>({
-    resolver: zodResolver(authSchema),
-    defaultValues: { invitation: invitedToken ? decodeURIComponent(invitedToken) : '' },
-  })
-  const submit = async (values: AuthValues) => {
-    setMessage(null)
-    if (!supabase) return
-    if (mode === 'register' && !values.invitation?.trim()) {
-      setMessage('Necesitas una invitación vigente.')
-      return
-    }
-    if (mode === 'register') {
-      const { error } = await supabase.functions.invoke('register-invited', {
-        body: { email: values.email, password: values.password, invitation: values.invitation },
-      })
-      setMessage(
-        error
-          ? 'La invitación no es válida o ya venció.'
-          : 'Cuenta creada. Ya puedes iniciar sesión y aceptar la invitación.',
-      )
-      if (!error) setMode('login')
-      return
-    }
-    const result = await supabase.auth.signInWithPassword({ email: values.email, password: values.password })
-    if (result.error) {
-      setMessage(result.error.message)
-      return
-    }
-    const user = result.data.user
-    if (!user) {
-      setMessage('Revisa tu correo para confirmar la cuenta.')
-      return
-    }
-    const { data: membership } = await supabase
-      .from('relationship_members')
-      .select('relationship_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    setSession({
-      userId: user.id,
-      email: user.email ?? values.email,
-      relationshipId: membership?.relationship_id ?? null,
-    })
-    navigate(returnTo ?? (membership?.relationship_id ? '/desbloquear' : '/vincular'))
-  }
-  const localPreview = async () => {
-    const vaults = await listVaults()
-    const relationshipId = vaults[0]?.relationshipId ?? `local-${crypto.randomUUID()}`
-    useAppStore.getState().setSession({ userId: 'local-user', email: 'vista@local', relationshipId })
-    navigate('/desbloquear')
-  }
-  return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <Link className="auth-mark" to="/">
-          <BookOpen />
-        </Link>
-        <p className="eyebrow">ACCESO PRIVADO</p>
-        <h1>{mode === 'login' ? 'Volver a tus páginas' : 'Aceptar una invitación'}</h1>
-        <p>La biblioteca exterior permanece separada de Nuestra Historia.</p>
-        {!isSupabaseConfigured && (
-          <Notice kind="warning">
-            Supabase aún no está configurado. La biblioteca pública sí funciona; completa las variables del
-            archivo de entorno para vincular dos cuentas.
-          </Notice>
-        )}
-        <form className="stack-form" onSubmit={handleSubmit(submit)}>
-          <Field label="Correo" error={errors.email?.message}>
-            <input type="email" autoComplete="email" {...register('email')} />
-          </Field>
-          <Field label="Contraseña" error={errors.password?.message}>
-            <input
-              type="password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              {...register('password')}
-            />
-          </Field>
-          {mode === 'register' && (
-            <Field label="Código de invitación">
-              <input {...register('invitation')} />
-            </Field>
-          )}
-          {message && <Notice kind="error">{message}</Notice>}
-          <button className="primary-button" disabled={!isSupabaseConfigured || isSubmitting}>
-            {isSubmitting ? 'Comprobando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta autorizada'}
-          </button>
-        </form>
-        <button
-          className="link-button"
-          onClick={() => setMode((value) => (value === 'login' ? 'register' : 'login'))}
-        >
-          {mode === 'login' ? 'Tengo una invitación' : 'Ya tengo una cuenta'}
-        </button>
-        {import.meta.env.DEV && (
-          <button className="secondary-button local-preview" onClick={() => void localPreview()}>
-            Abrir vista local cifrada
-          </button>
-        )}
-        <small className="auth-footnote">
-          <ShieldCheck /> Sin registro público. Solo dos personas con consentimiento.
-        </small>
-      </section>
-    </main>
-  )
+  return <AccessCodePanel />
 }
 
 export function LinkAccountPage() {

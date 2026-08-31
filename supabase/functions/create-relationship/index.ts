@@ -24,14 +24,12 @@ Deno.serve(async (request) => {
       .select('id')
       .single()
     if (relationError) throw relationError
-    const { error: memberError } = await admin
-      .from('relationship_members')
-      .insert({
-        relationship_id: relationship.id,
-        user_id: user.id,
-        status: 'active',
-        consented_at: new Date().toISOString(),
-      })
+    const { error: memberError } = await admin.from('relationship_members').insert({
+      relationship_id: relationship.id,
+      user_id: user.id,
+      status: 'active',
+      consented_at: new Date().toISOString(),
+    })
     if (memberError) {
       await admin.from('relationships').delete().eq('id', relationship.id)
       throw memberError

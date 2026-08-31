@@ -29,20 +29,13 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { dailyQuestions, letterCategories, rouletteOptions, signals } from '../data/seed'
-import {
-  createPairingEnvelope,
-  createPairingSecret,
-  createVault,
-  recoverVault,
-  unlockVault,
-} from '../lib/crypto'
+import { createPairingEnvelope, createPairingSecret } from '../lib/crypto'
 import {
   downloadEncryptedMemoryImage,
   uploadEncryptedMemoryImage,
   type EncryptedImageRef,
 } from '../lib/images'
 import {
-  activatePrivateSession,
   clearPrivateSession,
   createPresenceChannel,
   createPrivateItem,
@@ -51,10 +44,11 @@ import {
   listPrivateItems,
   subscribeToTable,
 } from '../lib/privateRepository'
-import { clearSensitiveCache, deleteVault, getSetting, getVault, putSetting, putVault } from '../lib/storage'
+import { clearSensitiveCache, deleteVault, getSetting, putSetting } from '../lib/storage'
 import { supabase } from '../lib/supabase'
 import { useAppStore } from '../store/app'
 import type { PrivateItem, PrivateTable } from '../types'
+import { AccessCodePanel } from '../components/AccessCodePanel'
 import { EmptyState, Field, Modal, Notice } from '../components/ui'
 
 const AUTO_LOCK_MS = 5 * 60_000
@@ -87,179 +81,7 @@ function usePrivateItems<T extends Record<string, unknown>>(table: PrivateTable)
 }
 
 export function UnlockPage() {
-  const session = useAppStore((state) => state.session)
-  const setPrivateLocked = useAppStore((state) => state.setPrivateLocked)
-  const navigate = useNavigate()
-  const [mode, setMode] = useState<'checking' | 'unlock' | 'create' | 'recover'>('checking')
-  const [pin, setPin] = useState('')
-  const [confirmPin, setConfirmPin] = useState('')
-  const [recovery, setRecovery] = useState('')
-  const [shownRecovery, setShownRecovery] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (!session) {
-      navigate('/acceso', { replace: true })
-      return
-    }
-    if (!session.relationshipId) {
-      navigate('/vincular', { replace: true })
-      return
-    }
-    void getVault(session.relationshipId).then((vault) => setMode(vault ? 'unlock' : 'create'))
-  }, [navigate, session])
-
-  const enter = () => {
-    setPrivateLocked(false)
-    navigate('/historia', { replace: true })
-  }
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!session?.relationshipId) return
-    setError('')
-    setBusy(true)
-    try {
-      if (mode === 'create') {
-        if (!/^.{6,}$/.test(pin)) throw new Error('Usa un PIN o frase de al menos 6 caracteres.')
-        if (pin !== confirmPin) throw new Error('Las dos entradas no coinciden.')
-        const created = await createVault(pin, session.relationshipId)
-        await putVault(created.record)
-        activatePrivateSession(created.masterKey, session.relationshipId, session.userId)
-        setShownRecovery(created.recoveryCode)
-      } else if (mode === 'recover') {
-        if (pin.length < 6) throw new Error('El nuevo PIN debe tener al menos 6 caracteres.')
-        const vault = await getVault(session.relationshipId)
-        if (!vault) throw new Error('No existe una bóveda local para recuperar.')
-        const recovered = await recoverVault(recovery.trim(), vault, pin)
-        await putVault(recovered.record)
-        activatePrivateSession(recovered.masterKey, session.relationshipId, session.userId)
-        enter()
-      } else {
-        const vault = await getVault(session.relationshipId)
-        if (!vault) {
-          setMode('create')
-          return
-        }
-        const masterKey = await unlockVault(pin, vault)
-        activatePrivateSession(masterKey, session.relationshipId, session.userId)
-        enter()
-      }
-    } catch {
-      setError(
-        mode === 'unlock' ? 'PIN o frase incorrecta.' : 'No fue posible abrir la bóveda. Revisa los datos.',
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <main className="unlock-page">
-      <Link className="quick-exit" to="/">
-        <X /> Salida rápida
-      </Link>
-      <section className="unlock-card">
-        <div className="constellation-mark">
-          <MoonStar />
-        </div>
-        <p className="eyebrow light">NUESTRA HISTORIA</p>
-        <h1>
-          {mode === 'create'
-            ? 'Protege este capítulo'
-            : mode === 'recover'
-              ? 'Recuperar la llave'
-              : 'Volver entre páginas'}
-        </h1>
-        <p>
-          {mode === 'create'
-            ? 'El PIN solo abre en este dispositivo la clave cifrada.'
-            : 'Tu contenido permanece oculto hasta que abras la bóveda.'}
-        </p>
-        {mode === 'checking' ? (
-          <div className="private-loader">
-            <span />
-          </div>
-        ) : (
-          <form className="stack-form" onSubmit={submit}>
-            {mode === 'recover' && (
-              <Field label="Código de recuperación">
-                <input
-                  value={recovery}
-                  onChange={(event) => setRecovery(event.target.value)}
-                  autoComplete="off"
-                />
-              </Field>
-            )}
-            <Field label={mode === 'recover' ? 'Nuevo PIN o frase' : 'PIN o frase secreta'}>
-              <input
-                type="password"
-                value={pin}
-                onChange={(event) => setPin(event.target.value)}
-                autoComplete="off"
-                autoFocus
-              />
-            </Field>
-            {mode === 'create' && (
-              <Field label="Repetir PIN o frase">
-                <input
-                  type="password"
-                  value={confirmPin}
-                  onChange={(event) => setConfirmPin(event.target.value)}
-                  autoComplete="off"
-                />
-              </Field>
-            )}
-            {error && <Notice kind="error">{error}</Notice>}
-            <button className="private-primary" disabled={busy}>
-              {busy
-                ? 'Abriendo…'
-                : mode === 'create'
-                  ? 'Crear bóveda'
-                  : mode === 'recover'
-                    ? 'Recuperar'
-                    : 'Abrir Nuestra Historia'}
-            </button>
-            {mode === 'unlock' && (
-              <button
-                type="button"
-                className="private-link"
-                onClick={() => {
-                  setMode('recover')
-                  setError('')
-                }}
-              >
-                Usar código de recuperación
-              </button>
-            )}
-          </form>
-        )}
-        <small>
-          <ShieldCheck /> AES-GCM · La clave maestra no sale de tu dispositivo
-        </small>
-      </section>
-      {shownRecovery && (
-        <Modal title="Guarda tu código de recuperación" onClose={() => undefined}>
-          <div className="recovery-box">
-            <p>Se mostrará una sola vez. Guárdalo fuera de este dispositivo.</p>
-            <code>{shownRecovery}</code>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                onChange={(event) =>
-                  event.target.checked && event.currentTarget.setAttribute('data-confirmed', 'true')
-                }
-              />
-              <span>Confirmo que lo guardé en un lugar seguro.</span>
-            </label>
-            <button className="primary-button" onClick={enter}>
-              Ya lo guardé, continuar
-            </button>
-          </div>
-        </Modal>
-      )}
-    </main>
-  )
+  return <AccessCodePanel />
 }
 
 const privateNav = [
