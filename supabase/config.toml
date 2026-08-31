@@ -1,0 +1,51 @@
+project_id = "lectura-de-libros"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173/**"]
+enable_signup = false
+minimum_password_length = 8
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+[realtime]
+enabled = true
+
+[functions.create-relationship]
+verify_jwt = true
+[functions.register-invited]
+verify_jwt = false
+[functions.create-invite]
+verify_jwt = true
+[functions.accept-invite]
+verify_jwt = true
+[functions.send-push]
+verify_jwt = true
+[functions.revoke-device]
+verify_jwt = true
+[functions.unlink]
+verify_jwt = true
+[functions.delete-account]
+verify_jwt = true
+[functions.cleanup-invites]
+verify_jwt = false
+[functions.appointment-reminders]
+verify_jwt = false

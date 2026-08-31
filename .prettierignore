@@ -1,0 +1,6 @@
+dist
+coverage
+playwright-report
+test-results
+package-lock.json
+prompt_codex_lectura_de_libros.md
