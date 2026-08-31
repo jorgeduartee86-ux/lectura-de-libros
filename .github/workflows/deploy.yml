@@ -33,9 +33,9 @@ jobs:
         run: npm run build
         env:
           VITE_APP_BASE_PATH: /${{ github.event.repository.name }}/
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+          VITE_SUPABASE_URL: https://rwdnklbsfpsusdwyetxt.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_LsIQKE0KUXLZomBvigBZjg_CcVKS_Gj
+          VITE_VAPID_PUBLIC_KEY: BKOEtfZRQysWc-2D1R3H7edeCgwPqM1l2MXY2yp9gTb0iD326D5fQ-yF-OtlcPamNb0T4y0Sjv001g4EB33TrX8
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
         with:
