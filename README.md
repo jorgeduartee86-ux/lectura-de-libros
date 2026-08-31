@@ -6,6 +6,8 @@ búsqueda y estadísticas locales. La zona **Nuestra Historia** añade conversac
 señales, cartas, preguntas, historia por turnos, ruleta, citas, recuerdos,
 constelación y regalos.
 
+Aplicación publicada: https://jorgeduartee86-ux.github.io/lectura-de-libros/
+
 ## Inicio rápido en Windows
 
 Requisitos: Node.js 24, Git y, para el backend local, Docker Desktop y Supabase CLI.

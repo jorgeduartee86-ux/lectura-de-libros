@@ -17,8 +17,12 @@ port = 54323
 
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://127.0.0.1:5173/**"]
+site_url = "https://jorgeduartee86-ux.github.io/lectura-de-libros/"
+additional_redirect_urls = [
+  "https://jorgeduartee86-ux.github.io/lectura-de-libros/**",
+  "http://localhost:5173/**",
+  "http://127.0.0.1:5173/**",
+]
 enable_signup = false
 minimum_password_length = 8
 
