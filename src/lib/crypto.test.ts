@@ -82,8 +82,8 @@ describe('protocolo de cifrado', () => {
   })
 
   it('permite que dos dispositivos con la misma clave abran los mismos mensajes', async () => {
-    const firstDevice = await createSharedVault('151025', context.relationshipId)
-    const secondDevice = await createSharedVault('151025', context.relationshipId)
+    const firstDevice = await createSharedVault('test-only-shared-code', context.relationshipId)
+    const secondDevice = await createSharedVault('test-only-shared-code', context.relationshipId)
     const envelope = await encryptContent(firstDevice.masterKey, { text: 'Nuestro capítulo' }, context)
     await expect(decryptContent(secondDevice.masterKey, envelope, context)).resolves.toEqual({
       text: 'Nuestro capítulo',
