@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
         manifest: {
           id: base,
@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
           scope: base,
           display: 'standalone',
           background_color: '#f7f4ed',
-          theme_color: '#632f3e',
+          theme_color: '#5C068C',
           orientation: 'portrait-primary',
           categories: ['books', 'lifestyle'],
           icons: [
@@ -65,6 +65,14 @@ export default defineConfig(({ mode }) => {
         devOptions: { enabled: true, navigateFallbackAllowlist: [/^\//] },
       }),
     ],
-    build: { sourcemap: false, target: 'es2022' },
+    build: {
+      sourcemap: false,
+      target: 'es2022',
+      rolldownOptions: {
+        output: {
+          codeSplitting: { groups: [{ name: 'supabase-client', test: /node_modules[\\/]@supabase[\\/]/ }] },
+        },
+      },
+    },
   }
 })

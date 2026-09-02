@@ -1,11 +1,11 @@
-# Instalar en Android
+# Android
 
-1. Abre la URL HTTPS en Chrome, Edge o un navegador compatible.
-2. Ve a **Instalar** dentro de la aplicación y pulsa **Instalar aplicación**.
-3. Si no aparece el botón, abre el menú del navegador y elige **Instalar app** o
-   **Añadir a pantalla principal**.
-4. Confirma y abre el icono **Lectura**.
+Abrir la página publicada en Chrome y usar Instalar aplicación cuando el navegador ofrezca la instalación. El botón de la web depende de beforeinstallprompt; si ya está instalada no se crea una segunda instalación. Abrir después desde su icono.
 
-Activa los avisos únicamente desde Nuestra Historia → Configuración. Android
-puede restringirlos por ahorro de batería; revisa los ajustes del sistema si no
-llegan. La aplicación muestra conectividad y reintenta el ciphertext pendiente.
+Entrar → Notificaciones → Activar o reparar avisos → permitir → Probar notificación. La app no puede concederse permiso por sí sola. Revisar también ajustes de notificaciones y batería del teléfono.
+
+Cámara, galería, documentos y micrófono requieren capacidades y permisos del navegador. La grabadora permite escuchar antes de enviar. Sin conexión, texto y archivos preparados conservan cola cifrada. Multimedia continúa cuando vuelve la red y el chat está abierto/desbloqueado.
+
+No desinstalar ni borrar datos para actualizar: usar el aviso de nueva versión, preservando el almacenamiento local.
+
+Se probó interfaz emulada Pixel 7 en Chromium, no instalación/push/cámara reales en Android físico. Una emulación móvil no certifica esos comportamientos.

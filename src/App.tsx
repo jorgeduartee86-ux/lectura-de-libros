@@ -22,6 +22,7 @@ import {
 } from './pages/PublicPages'
 import { useAppStore } from './store/app'
 import './App.css'
+import './features/chat/chat.css'
 
 const privatePage = <T extends keyof typeof import('./pages/PrivatePages')>(name: T) =>
   lazy(() => import('./pages/PrivatePages').then((module) => ({ default: module[name] as ComponentType })))
@@ -40,6 +41,17 @@ const Memories = privatePage('MemoriesPage')
 const Universe = privatePage('UniversePage')
 const Gifts = privatePage('GiftsPage')
 const PrivateSettings = privatePage('SettingsPage')
+const SavedMoments = lazy(() =>
+  import('./features/chat/ChatPage').then((module) => ({ default: module.SavedMomentsPage })),
+)
+const NotificationSettings = lazy(() =>
+  import('./features/chat/NotificationSettings').then((module) => ({
+    default: module.NotificationSettingsPage,
+  })),
+)
+const Storage = lazy(() =>
+  import('./features/chat/StoragePage').then((module) => ({ default: module.StoragePage })),
+)
 
 function Bootstrap() {
   const initialize = useAppStore((state) => state.initialize)
@@ -124,8 +136,10 @@ function Bootstrap() {
         <Route path="recuerdos" element={<Memories />} />
         <Route path="universo" element={<Universe />} />
         <Route path="regalos" element={<Gifts />} />
+        <Route path="momentos" element={<SavedMoments />} />
         <Route path="configuracion" element={<PrivateSettings />} />
-        <Route path="notificaciones" element={<PrivateSettings />} />
+        <Route path="notificaciones" element={<NotificationSettings />} />
+        <Route path="almacenamiento" element={<Storage />} />
         <Route path="privacidad" element={<PrivateSettings />} />
         <Route path="dispositivos" element={<PrivateSettings />} />
         <Route path="seguridad" element={<PrivateSettings />} />

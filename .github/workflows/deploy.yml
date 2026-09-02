@@ -61,8 +61,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install-deps chromium
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+        env:
+          VITE_SUPABASE_URL: https://rwdnklbsfpsusdwyetxt.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_LsIQKE0KUXLZomBvigBZjg_CcVKS_Gj
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

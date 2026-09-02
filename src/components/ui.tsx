@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import type { PropsWithChildren, ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Book } from '../types'
 
 export function BookCover({ book, compact = false }: { book: Book; compact?: boolean }) {
@@ -20,6 +21,48 @@ export function Modal({
   onClose,
   children,
 }: PropsWithChildren<{ title: string; onClose: () => void }>) {
+  const panel = useRef<HTMLElement>(null)
+  const close = useRef(onClose)
+  useEffect(() => {
+    close.current = onClose
+  }, [onClose])
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null
+    const node = panel.current
+    const selectors =
+      'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]'
+    node?.querySelector<HTMLElement>(selectors)?.focus()
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        close.current()
+        return
+      }
+      if (event.key !== 'Tab' || !node) return
+      const controls = Array.from(node.querySelectorAll<HTMLElement>(selectors)).filter(
+        (item) => item.getClientRects().length > 0,
+      )
+      if (!controls.length) {
+        event.preventDefault()
+        node.focus()
+        return
+      }
+      const first = controls[0],
+        last = controls.at(-1)!
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('keydown', key)
+      previous?.focus()
+    }
+  }, [])
   return (
     <div
       className="modal-backdrop"
@@ -28,7 +71,14 @@ export function Modal({
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <section
+        ref={panel}
+        tabIndex={-1}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
         <header>
           <h2 id="modal-title">{title}</h2>
           <button className="icon-button" onClick={onClose} aria-label="Cerrar">

@@ -1,12 +1,23 @@
 # Lectura de libros — Nuestra Historia
 
-PWA de biblioteca personal con una zona privada cifrada para exactamente dos
-adultos. El exterior permite gestionar libros, progreso, notas, citas, autores,
+PWA de biblioteca personal con una zona privada cifrada para una pareja, sin
+límite de dos accesos o dispositivos. El exterior permite gestionar libros, progreso, notas, citas, autores,
 búsqueda y estadísticas locales. La zona **Nuestra Historia** añade conversación,
 señales, cartas, preguntas, historia por turnos, ruleta, citas, recuerdos,
 constelación y regalos.
 
-Aplicación publicada: https://jorgeduartee86-ux.github.io/lectura-de-libros/
+Aplicación publicada: [Lectura de libros](https://jorgeduartee86-ux.github.io/lectura-de-libros/).
+
+## Usar la actualización 1.2
+
+R2 y Supabase ya están conectados; no hay que crear cuentas ni copiar claves.
+Abrir la aplicación y aceptar el aviso de actualización cuando aparezca, sin borrar
+sus datos. Entrar en Nuestra Historia con la clave habitual. El clip del chat permite
+adjuntar archivos, y el menú ofrece stickers, guardados y almacenamiento.
+
+En cada teléfono, entrar en Notificaciones, pulsar Activar y aceptar el permiso del
+sistema. Después usar la prueba de notificación. La aplicación no puede concederse
+ese permiso sola. Ver [pruebas y limitaciones](TESTING.md).
 
 ## Inicio rápido en Windows
 

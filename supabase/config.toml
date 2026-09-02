@@ -46,7 +46,7 @@ verify_jwt = true
 [functions.accept-invite]
 verify_jwt = true
 [functions.send-push]
-verify_jwt = true
+verify_jwt = false
 [functions.revoke-device]
 verify_jwt = true
 [functions.unlink]
@@ -56,6 +56,23 @@ verify_jwt = true
 [functions.cleanup-invites]
 verify_jwt = false
 [functions.appointment-reminders]
+verify_jwt = false
+
+[functions.r2-create-upload-url]
+verify_jwt = false
+[functions.r2-complete-upload]
+verify_jwt = false
+[functions.r2-create-download-url]
+verify_jwt = false
+[functions.r2-delete-object]
+verify_jwt = false
+[functions.r2-abort-upload]
+verify_jwt = false
+[functions.chat-delete-message]
+verify_jwt = false
+[functions.process-chat-jobs]
+verify_jwt = false
+[functions.register-push]
 verify_jwt = false
 [functions.quick-access]
 verify_jwt = true

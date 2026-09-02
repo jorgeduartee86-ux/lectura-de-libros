@@ -1,6 +1,6 @@
 import { BookKey, Delete, ShieldCheck, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { enterWithAccessCode } from '../lib/quickAccess'
 import { Notice } from './ui'
 
@@ -18,6 +18,7 @@ export function AccessCodePanel() {
   const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => inputRef.current?.focus(), [])
 
@@ -31,7 +32,8 @@ export function AccessCodePanel() {
     setBusy(true)
     try {
       await enterWithAccessCode(code)
-      navigate('/historia', { replace: true })
+      const next = new URLSearchParams(location.search).get('next')
+      navigate(next?.startsWith('/historia/') ? next : '/historia/conversacion', { replace: true })
     } catch (caught) {
       const reason = caught instanceof Error ? caught.message : 'access_failed'
       setCode('')

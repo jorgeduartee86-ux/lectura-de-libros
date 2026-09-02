@@ -53,6 +53,8 @@ export interface EncryptedRow {
   created_at: string
   scheduled_at?: string | null
   reminder_sent_at?: string | null
+  attachment_ids?: string[]
+  deleted_at?: string | null
 }
 
 export interface OutboxItem {
@@ -85,6 +87,8 @@ export interface PrivateItem<T = Record<string, unknown>> {
   createdAt: string
   content: T
   pending?: boolean
+  deleted?: boolean
+  failed?: boolean
 }
 
 export interface AppSession {

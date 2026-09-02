@@ -11,6 +11,12 @@ export function NotificationOnboarding({ session }: { session: AppSession | null
   useEffect(() => {
     if (!session || getPushState() !== 'granted') return
     void enablePushNotifications(session, false).then(setState)
+    const renew = (event: MessageEvent) => {
+      if (event.data?.type === 'PUSH_SUBSCRIPTION_CHANGED')
+        void enablePushNotifications(session, false).then(setState)
+    }
+    navigator.serviceWorker?.addEventListener('message', renew)
+    return () => navigator.serviceWorker?.removeEventListener('message', renew)
   }, [session])
 
   if (!session || !visible || state === 'granted' || state === 'unsupported') return null

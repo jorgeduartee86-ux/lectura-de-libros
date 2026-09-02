@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { Book, OutboxItem, PrivateCacheItem, VaultRecord } from '../types'
+import type { MediaJob } from './media/types'
 
 interface AppDatabase extends DBSchema {
   books: { key: string; value: Book; indexes: { 'by-status': Book['status'] } }
@@ -7,21 +8,34 @@ interface AppDatabase extends DBSchema {
   vaults: { key: string; value: VaultRecord }
   outbox: { key: string; value: OutboxItem; indexes: { 'by-next-attempt': number } }
   privateCache: { key: string; value: PrivateCacheItem; indexes: { 'by-table': string } }
+  mediaJobs: { key: string; value: MediaJob }
+  mediaChunks: {
+    key: string
+    value: { id: string; assetId: string; blob: Blob }
+    indexes: { 'by-asset': string }
+  }
 }
 
 let databasePromise: Promise<IDBPDatabase<AppDatabase>> | undefined
 
 export function getDatabase() {
-  databasePromise ??= openDB<AppDatabase>('lectura-de-libros', 1, {
-    upgrade(database) {
-      const books = database.createObjectStore('books', { keyPath: 'id' })
-      books.createIndex('by-status', 'status')
-      database.createObjectStore('settings', { keyPath: 'key' })
-      database.createObjectStore('vaults', { keyPath: 'id' })
-      const outbox = database.createObjectStore('outbox', { keyPath: 'id' })
-      outbox.createIndex('by-next-attempt', 'nextAttemptAt')
-      const cache = database.createObjectStore('privateCache', { keyPath: 'id' })
-      cache.createIndex('by-table', 'table')
+  databasePromise ??= openDB<AppDatabase>('lectura-de-libros', 2, {
+    upgrade(database, oldVersion) {
+      if (oldVersion < 1) {
+        const books = database.createObjectStore('books', { keyPath: 'id' })
+        books.createIndex('by-status', 'status')
+        database.createObjectStore('settings', { keyPath: 'key' })
+        database.createObjectStore('vaults', { keyPath: 'id' })
+        const outbox = database.createObjectStore('outbox', { keyPath: 'id' })
+        outbox.createIndex('by-next-attempt', 'nextAttemptAt')
+        const cache = database.createObjectStore('privateCache', { keyPath: 'id' })
+        cache.createIndex('by-table', 'table')
+      }
+      if (oldVersion < 2) {
+        database.createObjectStore('mediaJobs', { keyPath: 'id' })
+        const chunks = database.createObjectStore('mediaChunks', { keyPath: 'id' })
+        chunks.createIndex('by-asset', 'assetId')
+      }
     },
   })
   return databasePromise
@@ -90,6 +104,30 @@ export async function getPrivateCache(table: string) {
 
 export async function clearSensitiveCache() {
   await (await getDatabase()).clear('privateCache')
+}
+
+export async function putMediaJob(job: MediaJob) {
+  await (await getDatabase()).put('mediaJobs', job)
+}
+export async function getMediaJob(id: string) {
+  return (await getDatabase()).get('mediaJobs', id)
+}
+export async function listMediaJobs() {
+  return (await getDatabase()).getAll('mediaJobs')
+}
+export async function putMediaChunk(assetId: string, index: number, blob: Blob) {
+  await (await getDatabase()).put('mediaChunks', { id: `${assetId}:${index}`, assetId, blob })
+}
+export async function getMediaChunk(assetId: string, index: number) {
+  return (await (await getDatabase()).get('mediaChunks', `${assetId}:${index}`))?.blob
+}
+export async function removeMediaJob(id: string) {
+  const database = await getDatabase()
+  const transaction = database.transaction(['mediaJobs', 'mediaChunks'], 'readwrite')
+  await transaction.objectStore('mediaJobs').delete(id)
+  const keys = await transaction.objectStore('mediaChunks').index('by-asset').getAllKeys(id)
+  await Promise.all(keys.map((key) => transaction.objectStore('mediaChunks').delete(key)))
+  await transaction.done
 }
 
 export const indexedDbAuthStorage = {

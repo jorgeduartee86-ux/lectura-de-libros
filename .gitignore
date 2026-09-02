@@ -18,6 +18,7 @@ dist-ssr
 coverage
 playwright-report
 test-results
+.validation
 .supabase
 supabase/.temp
 

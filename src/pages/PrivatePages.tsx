@@ -5,7 +5,6 @@ import {
   Check,
   ChevronRight,
   CircleUserRound,
-  Clock3,
   Feather,
   Gift,
   Heart,
@@ -15,20 +14,14 @@ import {
   MessageCircleHeart,
   MoonStar,
   Orbit,
-  EyeOff,
-  Pencil,
   Plus,
-  Reply,
   RotateCw,
-  Send,
   Settings,
   ShieldCheck,
-  SmilePlus,
   Sparkles,
   Star,
   Trash2,
   UsersRound,
-  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -42,7 +35,6 @@ import {
   clearPrivateSession,
   createPresenceChannel,
   createPrivateItem,
-  createTypingChannel,
   listPrivateItems,
   subscribeToTable,
 } from '../lib/privateRepository'
@@ -54,6 +46,8 @@ import type { PrivateItem, PrivateTable } from '../types'
 import { AccessCodePanel } from '../components/AccessCodePanel'
 import { NotificationOnboarding } from '../components/NotificationOnboarding'
 import { EmptyState, Field, Modal, Notice } from '../components/ui'
+import { useChatActivity } from '../features/chat/activity'
+import { useActivityStream } from '../features/chat/useChat'
 
 const AUTO_LOCK_MS = 5 * 60_000
 
@@ -92,7 +86,11 @@ function usePrivateItems<T extends Record<string, unknown>>(table: PrivateTable)
     }
   }, [load, table])
   const add = useCallback(
-    async (contentType: string, content: T, metadata?: { scheduledAt?: string }) => {
+    async (
+      contentType: string,
+      content: T,
+      metadata?: { scheduledAt?: string; attachmentIds?: string[] },
+    ) => {
       const item = await createPrivateItem<T>(table, contentType, content, metadata)
       setItems((current) => [...current, item])
       return item
@@ -106,17 +104,53 @@ export function UnlockPage() {
   return <AccessCodePanel />
 }
 
-const privateNav = [
-  ['/historia', 'Portada', MoonStar],
-  ['/historia/conversacion', 'Capítulo', MessageCircleHeart],
-  ['/historia/marcapaginas', 'Marcapáginas', Heart],
-  ['/historia/cartas', 'Cartas', Feather],
-  ['/historia/pregunta', 'Pregunta', Sparkles],
-  ['/historia/nuestro-libro', 'Nuestro libro', BookHeart],
-  ['/historia/cita', 'Nuestra cita', CalendarHeart],
-  ['/historia/recuerdos', 'Recuerdos', Star],
-  ['/historia/universo', 'Universo', Orbit],
-  ['/historia/regalos', 'Regalos', Gift],
+const menuGroups = [
+  {
+    label: 'Comunicarnos',
+    items: [
+      ['/historia/conversacion', 'Chat', MessageCircleHeart],
+      ['/historia/cartas', 'Cartas', Feather],
+      ['/historia/marcapaginas', 'Marcapáginas', Heart],
+    ],
+  },
+  {
+    label: 'Enamorarnos',
+    items: [
+      ['/historia/pregunta', 'Pregunta del día', Sparkles],
+      ['/historia/ruleta', 'Ruleta romántica', RotateCw],
+      ['/historia/regalos', 'Regalos', Gift],
+      ['/historia/cita', 'Nuestra cita', CalendarHeart],
+      ['/historia/misma-pagina', 'En la misma página', UsersRound],
+    ],
+  },
+  {
+    label: 'Nuestra historia',
+    items: [
+      ['/historia', 'Portada', MoonStar],
+      ['/historia/recuerdos', 'Recuerdos', Star],
+      ['/historia/universo', 'Universo', Orbit],
+      ['/historia/nuestro-libro', 'Nuestro libro', BookHeart],
+      ['/historia/momentos', 'Momentos guardados', Heart],
+    ],
+  },
+  {
+    label: 'Lectura',
+    items: [
+      ['/biblioteca', 'Biblioteca', BookHeart],
+      ['/citas', 'Citas literarias', Feather],
+      ['/autores', 'Autores', UsersRound],
+    ],
+  },
+  {
+    label: 'Cuenta',
+    items: [
+      ['/historia/notificaciones', 'Notificaciones', Bell],
+      ['/historia/almacenamiento', 'Almacenamiento', BookHeart],
+      ['/historia/privacidad', 'Privacidad', ShieldCheck],
+      ['/historia/dispositivos', 'Dispositivos', CircleUserRound],
+      ['/historia/configuracion', 'Configuración', Settings],
+    ],
+  },
 ] as const
 
 export function PrivateShell() {
@@ -127,6 +161,8 @@ export function PrivateShell() {
   const setPrivateLocked = useAppStore((state) => state.setPrivateLocked)
   const [menuOpen, setMenuOpen] = useState(false)
   const [presenceCount, setPresenceCount] = useState(1)
+  const unread = useChatActivity((state) => state.count)
+  useActivityStream(!!session && !locked)
 
   const lock = useCallback(() => {
     clearPrivateSession()
@@ -135,17 +171,25 @@ export function PrivateShell() {
   }, [navigate, setPrivateLocked])
 
   useEffect(() => {
-    if (!session || locked) navigate('/desbloquear', { replace: true })
-  }, [locked, navigate, session])
+    if (!session || locked)
+      navigate(`/desbloquear?next=${encodeURIComponent(location.pathname + location.search)}`, {
+        replace: true,
+      })
+  }, [locked, navigate, session, location.pathname, location.search])
 
   useEffect(() => {
     let timer = window.setTimeout(lock, AUTO_LOCK_MS)
+    let hiddenAt = 0
     const reset = () => {
       window.clearTimeout(timer)
       timer = window.setTimeout(lock, AUTO_LOCK_MS)
     }
     const hide = () => {
-      if (document.hidden) lock()
+      // Conceal immediately; allow OS camera/file pickers to return without destroying the draft.
+      document.documentElement.dataset.privateHidden = String(document.hidden)
+      if (document.hidden) hiddenAt = Date.now()
+      else if (hiddenAt && Date.now() - hiddenAt >= AUTO_LOCK_MS) lock()
+      else reset()
     }
     const pageHide = () => lock()
     ;['pointerdown', 'keydown', 'touchstart'].forEach((name) =>
@@ -158,6 +202,7 @@ export function PrivateShell() {
       ;['pointerdown', 'keydown', 'touchstart'].forEach((name) => window.removeEventListener(name, reset))
       document.removeEventListener('visibilitychange', hide)
       window.removeEventListener('pagehide', pageHide)
+      delete document.documentElement.dataset.privateHidden
     }
   }, [lock])
 
@@ -176,6 +221,8 @@ export function PrivateShell() {
           className="icon-button"
           onClick={() => setMenuOpen((value) => !value)}
           aria-label="Abrir menú"
+          aria-expanded={menuOpen}
+          aria-controls="private-tools"
         >
           <Menu />
         </button>
@@ -194,23 +241,53 @@ export function PrivateShell() {
           <LogOut /> <span>Salida rápida</span>
         </button>
       </header>
-      <aside className={`private-sidebar ${menuOpen ? 'open' : ''}`}>
-        <nav>
-          {privateNav.map(([to, label, Icon]) => (
-            <NavLink to={to} end={to === '/historia'} key={to} onClick={() => setMenuOpen(false)}>
-              <Icon />
-              <span>{label}</span>
-            </NavLink>
+      {menuOpen && (
+        <button className="private-menu-scrim" onClick={() => setMenuOpen(false)} aria-label="Cerrar menú" />
+      )}
+      <aside id="private-tools" className={`private-sidebar ${menuOpen ? 'open' : ''}`}>
+        <nav aria-label="Herramientas de Nuestra Historia">
+          {menuGroups.map((group) => (
+            <section key={group.label}>
+              <h2>{group.label}</h2>
+              {group.items.map(([to, label, Icon]) => (
+                <NavLink to={to} end={to === '/historia'} key={to} onClick={() => setMenuOpen(false)}>
+                  <Icon />
+                  <span>{label}</span>
+                  {to === '/historia/conversacion' && unread > 0 && (
+                    <span className="unread-badge" aria-label={`${unread} mensajes sin leer`}>
+                      {unread}
+                    </span>
+                  )}
+                </NavLink>
+              ))}
+            </section>
           ))}
         </nav>
-        <NavLink className="settings-link" to="/historia/configuracion" onClick={() => setMenuOpen(false)}>
-          <Settings /> Configuración
-        </NavLink>
       </aside>
       <div className="private-main" key={location.pathname}>
         <Outlet />
       </div>
-      <NotificationOnboarding session={session} />
+      <nav className="private-bottom-nav" aria-label="Navegación principal privada">
+        <NavLink to="/historia/conversacion">
+          <MessageCircleHeart />
+          Chat{unread > 0 && <span className="unread-badge">{unread}</span>}
+        </NavLink>
+        <NavLink to="/historia/recuerdos">
+          <Star />
+          Recuerdos
+        </NavLink>
+        <NavLink to="/historia/cartas">
+          <Feather />
+          Cartas
+        </NavLink>
+        <button onClick={() => setMenuOpen(true)}>
+          <Menu />
+          Más
+        </button>
+      </nav>
+      {!['/historia/conversacion', '/historia/capitulo', '/historia/momentos'].includes(
+        location.pathname,
+      ) && <NotificationOnboarding session={session} />}
     </div>
   )
 }
@@ -281,235 +358,7 @@ export function StoryHomePage() {
   )
 }
 
-interface MessageContent extends Record<string, unknown> {
-  text: string
-  replyTo?: string
-  event?: 'edit' | 'delete-self' | 'delete-request' | 'reaction'
-  targetId?: string
-  reaction?: string
-}
-
-export function ConversationPage() {
-  const { items, loading, add } = usePrivateItems<MessageContent>('messages')
-  const [text, setText] = useState('')
-  const [replyTo, setReplyTo] = useState<string>()
-  const [query, setQuery] = useState('')
-  const [remoteTyping, setRemoteTyping] = useState(false)
-  const endRef = useRef<HTMLDivElement>(null)
-  const typingChannel = useRef<ReturnType<typeof createTypingChannel>>(null)
-  const session = useAppStore((state) => state.session)
-  const userId = session?.userId
-  const [today] = useState(() => new Date())
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!text.trim()) return
-    const value = text.trim()
-    setText('')
-    await add('message', { text: value, replyTo })
-    if (supabase && session?.relationshipId && !session.relationshipId.startsWith('local-'))
-      void supabase.functions.invoke('send-push', {
-        body: { relationshipId: session.relationshipId, notificationKind: 2 },
-      })
-    setReplyTo(undefined)
-  }
-  const sendEvent = async (event: NonNullable<MessageContent['event']>, targetId: string, value = '') => {
-    await add(`message-${event}`, {
-      text: event === 'edit' ? value : '',
-      event,
-      targetId,
-      ...(event === 'reaction' ? { reaction: '♡' } : {}),
-    })
-  }
-  const edit = (item: PrivateItem<MessageContent>) => {
-    const next = window.prompt('Editar mensaje', item.content.text)
-    if (next?.trim()) void sendEvent('edit', item.id, next.trim())
-  }
-  const events = items.filter((item) => item.content.event && item.content.targetId)
-  const hidden = new Set(
-    events
-      .filter((item) => item.content.event === 'delete-self' && item.senderId === userId)
-      .map((item) => item.content.targetId),
-  )
-  const displayedItems = items
-    .filter((item) => !item.content.event && !hidden.has(item.id))
-    .map((item) => {
-      const editEvent = events
-        .filter(
-          (event) =>
-            event.content.event === 'edit' &&
-            event.content.targetId === item.id &&
-            event.senderId === item.senderId,
-        )
-        .at(-1)
-      return {
-        ...item,
-        content: editEvent ? { ...item.content, text: editEvent.content.text } : item.content,
-        reactions: events.filter(
-          (event) => event.content.event === 'reaction' && event.content.targetId === item.id,
-        ).length,
-        deleteRequested: events.some(
-          (event) => event.content.event === 'delete-request' && event.content.targetId === item.id,
-        ),
-      }
-    })
-    .filter((item) => item.content.text.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [items])
-  useEffect(() => {
-    typingChannel.current = createTypingChannel(setRemoteTyping)
-    return () => {
-      void typingChannel.current?.close()
-    }
-  }, [])
-  useEffect(() => {
-    void typingChannel.current?.send(text.length > 0)
-    const timer = window.setTimeout(() => void typingChannel.current?.send(false), 1200)
-    return () => window.clearTimeout(timer)
-  }, [text])
-  return (
-    <main className="private-page conversation-page">
-      <header className="private-page-heading chat-heading">
-        <div className="chat-person">
-          <span className="chat-avatar" aria-hidden="true">
-            <BookHeart />
-          </span>
-          <div>
-            <p className="private-eyebrow">
-              CAPÍTULO{' '}
-              {Math.ceil((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000)}
-            </p>
-            <h1>Entre páginas</h1>
-            <p className="chat-security">
-              <ShieldCheck /> Conversación privada y sincronizada
-            </p>
-          </div>
-        </div>
-        <label className="private-search">
-          <span className="sr-only">Buscar en este capítulo</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar en el capítulo…"
-          />
-        </label>
-      </header>
-      <div className="chat-date-divider">
-        <span>Hoy · seguimos escribiendo</span>
-      </div>
-      <section className="messages" aria-live="polite">
-        {loading ? (
-          <div className="private-loader">
-            <span />
-          </div>
-        ) : displayedItems.length === 0 ? (
-          <EmptyState
-            icon={<MessageCircleHeart />}
-            title="La página está en blanco"
-            text="Escribe la primera línea de este capítulo."
-          />
-        ) : (
-          displayedItems.map((item) => {
-            const mine = item.senderId === userId
-            return (
-              <div className={`message-row ${mine ? 'mine' : ''}`} key={item.id}>
-                {!mine && (
-                  <span className="message-avatar">
-                    <MoonStar />
-                  </span>
-                )}
-                <article className={`message ${mine ? 'mine' : ''}`}>
-                  <small className="message-author">{mine ? 'Tú' : 'La otra persona'}</small>
-                  {item.content.replyTo && <small className="reply-label">En respuesta a otra página</small>}
-                  <p>{item.content.text}</p>
-                  {item.deleteRequested && (
-                    <small className="reply-label">Se solicitó borrarlo para ambos</small>
-                  )}
-                  {item.reactions > 0 && <span className="message-reaction">♡ {item.reactions}</span>}
-                  <div className="message-bottom">
-                    <nav className="message-tools" aria-label="Acciones del mensaje">
-                      <button onClick={() => setReplyTo(item.id)} title="Responder" aria-label="Responder">
-                        <Reply />
-                      </button>
-                      <button
-                        onClick={() => void sendEvent('reaction', item.id)}
-                        title="Reaccionar"
-                        aria-label="Reaccionar"
-                      >
-                        <SmilePlus />
-                      </button>
-                      {mine && (
-                        <button onClick={() => edit(item)} title="Editar" aria-label="Editar">
-                          <Pencil />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => void sendEvent('delete-self', item.id)}
-                        title="Ocultar para mí"
-                        aria-label="Ocultar para mí"
-                      >
-                        <EyeOff />
-                      </button>
-                      {mine && (
-                        <button
-                          onClick={() => void sendEvent('delete-request', item.id)}
-                          title="Borrar para ambos"
-                          aria-label="Borrar para ambos"
-                        >
-                          <Trash2 />
-                        </button>
-                      )}
-                    </nav>
-                    <footer>
-                      <time>
-                        {new Date(item.createdAt).toLocaleTimeString('es-CO', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </time>
-                      {item.pending ? (
-                        <Clock3 aria-label="Pendiente de sincronizar" />
-                      ) : (
-                        <Check aria-label="Enviado" />
-                      )}
-                    </footer>
-                  </div>
-                </article>
-              </div>
-            )
-          })
-        )}
-        <div ref={endRef} />
-      </section>
-      {text.length > 0 && <div className="typing-indicator">Escribiendo en este dispositivo…</div>}
-      {remoteTyping && <div className="typing-indicator">La otra persona está escribiendo…</div>}
-      {replyTo && (
-        <div className="reply-composer">
-          <span>Responder a un mensaje</span>
-          <button onClick={() => setReplyTo(undefined)}>
-            <X />
-          </button>
-        </div>
-      )}
-      <form className="message-composer" onSubmit={submit}>
-        <label className="sr-only" htmlFor="message">
-          Escribe un mensaje
-        </label>
-        <textarea
-          id="message"
-          rows={1}
-          maxLength={4000}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder="Escribe un mensaje…"
-        />
-        <button className="send-button" disabled={!text.trim()} aria-label="Enviar">
-          <Send />
-        </button>
-      </form>
-    </main>
-  )
-}
+export { ChatPage as ConversationPage } from '../features/chat/ChatPage'
 
 interface SignalContent extends Record<string, unknown> {
   label: string
@@ -517,6 +366,7 @@ interface SignalContent extends Record<string, unknown> {
 }
 
 export function SignalsPage() {
+  const navigate = useNavigate()
   const { items, add } = usePrivateItems<SignalContent>('signals')
   const [sent, setSent] = useState('')
   const session = useAppStore((state) => state.session)
@@ -527,7 +377,6 @@ export function SignalsPage() {
         body: { relationshipId: session.relationshipId, notificationKind: 1 },
       })
     setSent(label)
-    navigator.vibrate?.(35)
     setTimeout(() => setSent(''), 2200)
   }
   return (
@@ -558,15 +407,25 @@ export function SignalsPage() {
           <h2>Señales recientes</h2>
           <div className="event-list">
             {items
-              .slice(-6)
+              .slice()
               .reverse()
               .map((item) => (
-                <div key={item.id}>
+                <div key={item.id} id={`entry-${item.id}`}>
                   <Heart />
                   <span>
                     <strong>{item.content.label}</strong>
                     <small>{new Date(item.createdAt).toLocaleString('es-CO')}</small>
                   </span>
+                  <button
+                    className="private-secondary"
+                    onClick={async () => {
+                      const { draftToolReply } = await import('../features/chat/repository')
+                      await draftToolReply('marcapaginas', item.id, item.content.label)
+                      navigate('/historia/conversacion')
+                    }}
+                  >
+                    Responder
+                  </button>
                 </div>
               ))}
           </div>
@@ -595,7 +454,6 @@ export function SamePagePage() {
       )
       if (other) {
         setMatched(true)
-        navigator.vibrate?.([35, 50, 35])
       }
       setHolding(false)
     }, 1200)
@@ -675,6 +533,7 @@ interface LetterContent extends Record<string, unknown> {
 }
 
 export function LettersPage() {
+  const navigate = useNavigate()
   const { items, add } = usePrivateItems<LetterContent>('letters')
   const [creating, setCreating] = useState(false)
   const [opened, setOpened] = useState<PrivateItem<LetterContent> | null>(null)
@@ -712,6 +571,7 @@ export function LettersPage() {
             .map((item) => (
               <button
                 className="letter-card"
+                id={`entry-${item.id}`}
                 key={item.id}
                 onClick={() => canOpen(item.content) && setOpened(item)}
                 disabled={!canOpen(item.content)}
@@ -802,6 +662,16 @@ export function LettersPage() {
             <p className="eyebrow">{opened.content.category}</p>
             <p>{opened.content.body}</p>
             <footer>Guardada el {new Date(opened.createdAt).toLocaleDateString('es-CO')}</footer>
+            <button
+              className="private-primary"
+              onClick={async () => {
+                const { draftToolReply } = await import('../features/chat/repository')
+                await draftToolReply('cartas', opened.id, opened.content.title)
+                navigate('/historia/conversacion')
+              }}
+            >
+              Responder en el chat
+            </button>
           </article>
         </Modal>
       )}
@@ -1196,7 +1066,11 @@ export function MemoriesPage() {
     setError('')
     try {
       const encryptedImage = image ? await uploadEncryptedMemoryImage(image) : undefined
-      await add('memory', { ...form, image: encryptedImage })
+      await add(
+        'memory',
+        { ...form, image: encryptedImage },
+        { attachmentIds: encryptedImage?.storage === 'r2' ? [encryptedImage.assetId] : undefined },
+      )
       setCreating(false)
       setImage(null)
       setForm({ category: 'Recuerdo', title: '', text: '', link: '' })
