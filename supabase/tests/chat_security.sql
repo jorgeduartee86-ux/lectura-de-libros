@@ -1,5 +1,5 @@
 begin;
-select plan(19);
+select plan(21);
 select has_table('public','media_attachments','media exists');
 select has_table('public','media_references','references exist');
 select has_table('public','custom_stickers','sticker library exists');
@@ -19,5 +19,7 @@ select has_trigger('public','messages','messages_media','references bind transac
 select has_trigger('public','message_receipts','receipts_relation','receipt relation is checked');
 select has_trigger('public','message_reactions','reactions_relation','reaction relation is checked');
 select is((select count(*)::integer from pg_class where relnamespace='public'::regnamespace and relname in ('media_attachments','media_references','custom_stickers','push_jobs','push_job_deliveries','scheduled_messages','starred_messages','pinned_messages','user_notification_settings') and relrowsecurity),9,'RLS enabled on every new table');
+select ok(not exists(select 1 from pg_proc where pronamespace='public'::regnamespace and proname in ('claim_media_deletion','stale_media_candidates','count_unread_for_user','claim_push_jobs','publish_scheduled_messages','consume_rate_limit','join_quick_access') and (has_function_privilege('anon',oid,'execute') or has_function_privilege('authenticated',oid,'execute'))),'all privileged RPCs reject browser roles, including default grants');
+select ok(not exists(select 1 from pg_proc where pronamespace='public'::regnamespace and proname in ('claim_media_deletion','stale_media_candidates','count_unread_for_user','claim_push_jobs','publish_scheduled_messages','consume_rate_limit','join_quick_access') and not has_function_privilege('service_role',oid,'execute')),'service role retains every privileged RPC');
 select * from finish();
 rollback;

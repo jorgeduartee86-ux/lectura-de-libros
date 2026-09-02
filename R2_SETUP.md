@@ -27,7 +27,7 @@ Variables del servidor:
 ## Backend desplegado
 
 1. Cinco variables R2 guardadas. VAPID y CRON_SECRET existentes conservados.
-2. Migración 202609020007 aplicada con Supabase CLI. Se verificó el esquema heredado y se registraron las migraciones 001–006 ya existentes, cuyo historial no estaba creado; no se volvieron a ejecutar.
+2. Migraciones 007 (esquema) y 008 (permisos explícitos de funciones) aplicadas con Supabase CLI. Se verificó el esquema heredado y se registraron las migraciones 001–006 ya existentes, cuyo historial no estaba creado; no se volvieron a ejecutar.
 3. Desplegadas r2-create-upload-url, r2-complete-upload, r2-create-download-url, r2-delete-object, r2-abort-upload, chat-delete-message, register-push, send-push y process-chat-jobs.
 4. Activa una sola tarea `chat-jobs-every-minute` con pg_cron + pg_net. Su encabezado x-cron-secret se obtiene de Vault sin exportarlo. Respuesta HTTP 200 comprobada. Las tareas anteriores de citas e invitaciones permanecen activas.
 5. Integración real mediante usuarios y archivos sintéticos aislados: resultados en TESTING.md.

@@ -14,6 +14,7 @@ Conexión R2 autorizada y configurada. Backend desplegado y comprobado con sesio
 - Preferencias push, diagnóstico, registro multidispositivo, trabajos duraderos y recordatorios limitados.
 - Frase compartida, accesos románticos y compatibilidad de fotos antiguas.
 - Migración SQL aditiva y nueve funciones nuevas/actualizadas de almacenamiento y entrega.
+- Permisos de funciones explícitos mediante migración 008, también en instalaciones Supabase con concesiones directas por defecto.
 - Actualización PWA con aviso y colas preservadas.
 
 ### Infraestructura verificada
